@@ -18,7 +18,7 @@ class FFmpegAlsaTrack(MediaStreamTrack):
 
         # 16-bit little-endian PCM
         self.bytes_per_sample = 2
-        self.frame_samples = 960  # 60ms @ 16k (safe). We can tune later.
+        self.frame_samples = 320  # 20ms @ 16k (safe). We can tune later.
         self.frame_bytes = self.frame_samples * self.channels * self.bytes_per_sample
 
         cmd = [
