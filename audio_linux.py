@@ -36,6 +36,8 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         self._pts = 0
 
     async def recv(self):
+        if self._pts == 0:
+            print("frame_samples", self.frame_samples, "layout", "mono", "sr", self.sample_rate)
         assert self.proc.stdout is not None
         data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
         if not data or len(data) < self.frame_bytes:
