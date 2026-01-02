@@ -1,0 +1,11 @@
+[project]
+name = "pipecat-room-client"
+version = "0.1.0"
+requires-python = "==3.9.*"
+dependencies = [
+  "pipecat-ai",
+  "sounddevice",
+  "numpy",
+  "aiohttp",
+  "aiortc",
+]
