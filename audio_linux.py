@@ -39,6 +39,9 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
         if not data or len(data) < self.frame_bytes:
             raise asyncio.CancelledError("Audio capture ended")
+        
+        if self._pts == 0:
+            print("✅ mic bytes flowing")
 
         # Convert bytes -> numpy int16
         samples = np.frombuffer(data, dtype=np.int16)
