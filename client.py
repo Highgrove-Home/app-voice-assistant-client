@@ -12,22 +12,27 @@ ROOM = os.environ.get("ROOM", "bedroom")
 SERVER = os.environ.get("PIPECAT_SERVER", "http://pi-voice.local:7860").rstrip("/")
 OFFER_URL = f"{SERVER}/api/offer"
 
-def build_mic_player():
-    """
-    Mic capture:
-      - macOS: avfoundation "default"
-      - Linux: ALSA device from env ALSA_DEVICE (e.g. "hw:1,0" or "default")
-    """
+def build_mic_track():
     sys = platform.system().lower()
 
     if sys == "darwin":
-        player = build_mic_player()
+        audio_index = os.environ.get("MAC_AUDIO_INDEX", "0")
+        player = MediaPlayer(
+            f":{audio_index}",
+            format="avfoundation",
+            options={"sample_rate": "16000", "channels": "1"},
+        )
         if not player.audio:
-            raise RuntimeError("No audio track from microphone capture")
-        pc.addTrack(player.audio)
-    else:
-        alsa_dev = os.environ.get("ALSA_DEVICE", "hw:1,0")
-        pc.addTrack(FFmpegAlsaTrack(device=alsa_dev, sample_rate=16000, channels=1))
+            raise RuntimeError("No audio track from macOS microphone")
+        return player.audio
+
+    # Linux
+    alsa_dev = os.environ.get("ALSA_DEVICE", "hw:1,0")
+    return FFmpegAlsaTrack(
+        device=alsa_dev,
+        sample_rate=16000,
+        channels=1,
+    )
 
 async def main():
     pc = RTCPeerConnection()
