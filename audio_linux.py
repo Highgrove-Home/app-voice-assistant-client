@@ -32,16 +32,25 @@ class FFmpegAlsaTrack(MediaStreamTrack):
             "-f", "s16le",
             "pipe:1",
         ]
-        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
+        print(f"🎤 Starting FFmpeg ALSA capture from {device}")
+        print(f"   Command: {' '.join(cmd)}")
+        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         self._pts = 0
 
     async def recv(self):
         if self._pts == 0:
-            print("frame_samples", self.frame_samples, "layout", "mono", "sr", self.sample_rate)
+            print(f"🎤 Starting audio capture: {self.frame_samples} samples/frame, mono, {self.sample_rate}Hz")
+
+        # Check if FFmpeg process has died
+        if self.proc.poll() is not None:
+            stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
+            raise RuntimeError(f"FFmpeg process died. stderr: {stderr_output}")
+
         assert self.proc.stdout is not None
         data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
         if not data or len(data) < self.frame_bytes:
-            raise asyncio.CancelledError("Audio capture ended")
+            stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
+            raise asyncio.CancelledError(f"Audio capture ended. stderr: {stderr_output}")
 
         # int16 mono samples, shape (samples,)
         samples = np.frombuffer(data, dtype=np.int16)
@@ -60,6 +69,11 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         frame.pts = self._pts
         frame.time_base = Fraction(1, self.sample_rate)
         self._pts += arr.shape[0]  # number of samples
+
+        # Debug: log every 50 frames (~1 second)
+        if self._pts % (self.sample_rate) < self.frame_samples:
+            avg_amplitude = np.abs(samples).mean()
+            print(f"🎤 Audio frame sent: pts={self._pts}, avg_amplitude={avg_amplitude:.1f}")
 
         return frame
 

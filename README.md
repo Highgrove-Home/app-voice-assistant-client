@@ -30,6 +30,37 @@ uv sync
 python client.py
 ```
 
+### Environment Variables
+
+- `ALSA_DEVICE`: ALSA audio device (default: `hw:1,0`)
+- `ROOM`: Room identifier (default: `bedroom`)
+- `PIPECAT_SERVER`: Pipecat server URL (default: `http://pi-voice.local:7860`)
+
+Example:
+```bash
+ALSA_DEVICE=hw:2,0 ROOM=kitchen python client.py
+```
+
+## Troubleshooting
+
+### No Audio Being Sent
+
+If the server reports no audio frames are being received, run the diagnostic script:
+
+```bash
+python scripts/audio_debug.py
+```
+
+This will:
+1. List all available ALSA devices
+2. Test FFmpeg audio capture
+3. Provide recommendations
+
+Common issues:
+- **Wrong device**: ReSpeaker may not be at `hw:1,0` - check with `arecord -l`
+- **Permissions**: User must be in the `audio` group: `sudo usermod -a -G audio $USER`
+- **Device in use**: Another process may be using the microphone
+
 ## Hardware Setup
 
 The client is designed to work with ReSpeaker devices, which provide:
