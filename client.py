@@ -44,11 +44,11 @@ async def main():
     def on_open():
         dc.send(json.dumps({"room": ROOM, "client": "python-room-client"}))
 
-    player = build_mic_player()
-    if not player.audio:
+    audio_track = build_mic_track()
+    if not audio_track:
         raise RuntimeError("No audio track from microphone capture")
 
-    pc.addTrack(player.audio)
+    pc.addTrack(audio_track)
 
     offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
