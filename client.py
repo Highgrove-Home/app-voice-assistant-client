@@ -6,6 +6,7 @@ import aiohttp
 
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
+from audio_linux import FFmpegAlsaTrack
 
 ROOM = os.environ.get("ROOM", "bedroom")
 SERVER = os.environ.get("PIPECAT_SERVER", "http://pi-voice.local:7860").rstrip("/")
@@ -20,20 +21,13 @@ def build_mic_player():
     sys = platform.system().lower()
 
     if sys == "darwin":
-        audio_index = os.environ.get("MAC_AUDIO_INDEX", "0")
-        return MediaPlayer(
-            f":{audio_index}",
-            format="avfoundation",
-            options={"sample_rate": "16000", "channels": "1"},
-        )
-
-    # Linux: PulseAudio device from env PULSE_DEVICE (e.g. "default" or "hw:1,0")
-    pulse_dev = os.environ.get("PULSE_DEVICE", "default")
-    return MediaPlayer(
-        pulse_dev,
-        format="pulse",
-        options={"sample_rate": "16000", "channels": "1"},
-    )
+        player = build_mic_player()
+        if not player.audio:
+            raise RuntimeError("No audio track from microphone capture")
+        pc.addTrack(player.audio)
+    else:
+        alsa_dev = os.environ.get("ALSA_DEVICE", "hw:1,0")
+        pc.addTrack(FFmpegAlsaTrack(device=alsa_dev, sample_rate=16000, channels=1))
 
 async def main():
     pc = RTCPeerConnection()
