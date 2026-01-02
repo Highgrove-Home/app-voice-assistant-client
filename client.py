@@ -27,11 +27,11 @@ def build_mic_player():
             options={"sample_rate": "16000", "channels": "1"},
         )
 
-    # Linux
-    alsa_dev = os.environ.get("ALSA_DEVICE", "default")
+    # Linux: PulseAudio device from env PULSE_DEVICE (e.g. "default" or "hw:1,0")
+    pulse_dev = os.environ.get("PULSE_DEVICE", "default")
     return MediaPlayer(
-        alsa_dev,
-        format="alsa",
+        pulse_dev,
+        format="pulse",
         options={"sample_rate": "16000", "channels": "1"},
     )
 
