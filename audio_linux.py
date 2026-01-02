@@ -5,7 +5,8 @@ from typing import Optional
 import numpy as np
 from aiortc import MediaStreamTrack
 from av import AudioFrame
-
+import av
+from fractions import Fraction
 
 class FFmpegAlsaTrack(MediaStreamTrack):
     kind = "audio"
@@ -34,7 +35,31 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
         self._pts = 0
 
-    async def recv(self) -> AudioFrame:
+    async def recv(self):
+    assert self.proc.stdout is not None
+    data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
+    if not data or len(data) < self.frame_bytes:
+        raise asyncio.CancelledError("Audio capture ended")
+
+    # int16 mono samples, shape (samples,)
+    samples = np.frombuffer(data, dtype=np.int16)
+
+    # IMPORTANT: shape must be (samples, channels) for from_ndarray
+    if self.channels == 1:
+        arr = samples.reshape(-1, 1)
+        layout = "mono"
+    else:
+        arr = samples.reshape(-1, self.channels)
+        layout = "stereo"
+
+    frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
+    frame.sample_rate = self.sample_rate
+
+    frame.pts = self._pts
+    frame.time_base = Fraction(1, self.sample_rate)
+    self._pts += arr.shape[0]  # number of samples
+
+    return frame
         assert self.proc.stdout is not None
         data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
         if not data or len(data) < self.frame_bytes:
