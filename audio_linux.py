@@ -36,48 +36,29 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         self._pts = 0
 
     async def recv(self):
-    assert self.proc.stdout is not None
-    data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
-    if not data or len(data) < self.frame_bytes:
-        raise asyncio.CancelledError("Audio capture ended")
-
-    # int16 mono samples, shape (samples,)
-    samples = np.frombuffer(data, dtype=np.int16)
-
-    # IMPORTANT: shape must be (samples, channels) for from_ndarray
-    if self.channels == 1:
-        arr = samples.reshape(-1, 1)
-        layout = "mono"
-    else:
-        arr = samples.reshape(-1, self.channels)
-        layout = "stereo"
-
-    frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
-    frame.sample_rate = self.sample_rate
-
-    frame.pts = self._pts
-    frame.time_base = Fraction(1, self.sample_rate)
-    self._pts += arr.shape[0]  # number of samples
-
-    return frame
         assert self.proc.stdout is not None
         data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
         if not data or len(data) < self.frame_bytes:
             raise asyncio.CancelledError("Audio capture ended")
-        
-        if self._pts == 0:
-            print("✅ mic bytes flowing")
 
-        # Convert bytes -> numpy int16
+        # int16 mono samples, shape (samples,)
         samples = np.frombuffer(data, dtype=np.int16)
 
-        frame = AudioFrame(format="s16", layout="mono" if self.channels == 1 else "stereo", samples=self.frame_samples)
-        frame.planes[0].update(samples.tobytes())
+        # IMPORTANT: shape must be (samples, channels) for from_ndarray
+        if self.channels == 1:
+            arr = samples.reshape(-1, 1)
+            layout = "mono"
+        else:
+            arr = samples.reshape(-1, self.channels)
+            layout = "stereo"
 
+        frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
         frame.sample_rate = self.sample_rate
+
         frame.pts = self._pts
-        frame.time_base = (1, self.sample_rate)
-        self._pts += self.frame_samples
+        frame.time_base = Fraction(1, self.sample_rate)
+        self._pts += arr.shape[0]  # number of samples
+
         return frame
 
     def stop(self):
