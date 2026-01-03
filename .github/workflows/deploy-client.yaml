@@ -35,6 +35,5 @@ jobs:
 
       - name: Restart systemd service
         run: |
-          sudo /usr/bin/systemctl daemon-reload
           sudo /usr/bin/systemctl restart pipecat-room-client
           sudo /usr/bin/systemctl --no-pager --full status pipecat-room-client
