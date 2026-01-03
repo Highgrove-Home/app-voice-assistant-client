@@ -12,7 +12,7 @@ ROOM = os.environ.get("ROOM", "bedroom")
 SERVER = os.environ.get("PIPECAT_SERVER", "http://pi-voice.local:7860").rstrip("/")
 OFFER_URL = f"{SERVER}/api/offer"
 HEALTHCHECK_INTERVAL = int(os.environ.get("HEALTHCHECK_INTERVAL", "5"))
-HEALTHCHECK_TIMEOUT = int(os.environ.get("HEALTHCHECK_TIMEOUT", "10"))
+HEALTHCHECK_TIMEOUT = int(os.environ.get("HEALTHCHECK_TIMEOUT", "30"))
 
 def build_mic_track():
     sys = platform.system().lower()
