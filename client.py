@@ -11,6 +11,8 @@ from aiortc.contrib.media import MediaPlayer
 ROOM = os.environ.get("ROOM", "bedroom")
 SERVER = os.environ.get("PIPECAT_SERVER", "http://pi-voice.local:7860").rstrip("/")
 OFFER_URL = f"{SERVER}/api/offer"
+HEALTHCHECK_INTERVAL = int(os.environ.get("HEALTHCHECK_INTERVAL", "5"))
+HEALTHCHECK_TIMEOUT = int(os.environ.get("HEALTHCHECK_TIMEOUT", "10"))
 
 def build_mic_track():
     sys = platform.system().lower()
@@ -40,6 +42,7 @@ async def connect_to_server():
     """Attempt to connect to the server and maintain the connection"""
     pc = RTCPeerConnection()
     connection_closed = asyncio.Event()
+    last_pong_time = {"time": time.time()}
 
     # Data channel for metadata (room, etc.)
     dc = pc.createDataChannel("meta")
@@ -48,6 +51,8 @@ async def connect_to_server():
     def on_open():
         print(f"📡 Data channel opened, sending room={ROOM}")
         dc.send(json.dumps({"room": ROOM, "client": "python-room-client"}))
+        # Reset pong timer on channel open
+        last_pong_time["time"] = time.time()
 
     audio_track = build_mic_track()
     if not audio_track:
@@ -83,8 +88,18 @@ async def connect_to_server():
 
     @dc.on("message")
     def on_dc_message(message):
-        # Update last activity time on any message (including heartbeats)
+        # Update last activity time on any message
         last_activity["time"] = time.time()
+
+        # Handle pong responses
+        try:
+            data = json.loads(message)
+            if isinstance(data, dict) and data.get("type") == "pong":
+                last_pong_time["time"] = time.time()
+                print(f"🏓 Pong received")
+        except (json.JSONDecodeError, TypeError):
+            # Not JSON or not a pong, ignore
+            pass
 
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
@@ -123,19 +138,38 @@ async def connect_to_server():
 
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
 
+    # Ping task - send pings every HEALTHCHECK_INTERVAL seconds
+    async def ping_task():
+        print(f"🏓 Ping task started (interval: {HEALTHCHECK_INTERVAL}s)")
+        await asyncio.sleep(2)  # Wait for data channel to be ready
+
+        while not connection_closed.is_set():
+            try:
+                if dc.readyState == "open":
+                    ping_msg = json.dumps({"type": "ping", "timestamp": time.time()})
+                    dc.send(ping_msg)
+                    print(f"🏓 Ping sent")
+                else:
+                    print(f"⚠️  Data channel not open (state: {dc.readyState})")
+            except Exception as e:
+                print(f"⚠️  Failed to send ping: {e}")
+
+            await asyncio.sleep(HEALTHCHECK_INTERVAL)
+
     # Watchdog to detect dead connections
     async def watchdog():
-        timeout = 30  # seconds without any activity
-        print(f"🐕 Watchdog started (checking every 10s, timeout: {timeout}s)")
+        print(f"🐕 Watchdog started (checking every 5s, pong timeout: {HEALTHCHECK_TIMEOUT}s)")
+        await asyncio.sleep(5)  # Initial delay
+
         while not connection_closed.is_set():
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
 
             if connection_closed.is_set():
                 break
 
-            time_since_activity = time.time() - last_activity["time"]
+            time_since_pong = time.time() - last_pong_time["time"]
 
-            # Also check connection state
+            # Check connection state
             if pc.connectionState in ["failed", "closed", "disconnected"]:
                 print(f"⚠️  Watchdog: Connection state is {pc.connectionState}")
                 connection_closed.set()
@@ -146,20 +180,25 @@ async def connect_to_server():
                 connection_closed.set()
                 break
 
-            if time_since_activity > timeout:
-                print(f"⚠️  Watchdog: No activity for {time_since_activity:.1f}s (timeout: {timeout}s)")
+            # Check pong timeout
+            if time_since_pong > HEALTHCHECK_TIMEOUT:
+                print(f"⚠️  Watchdog: No pong for {time_since_pong:.1f}s (timeout: {HEALTHCHECK_TIMEOUT}s) - reconnecting")
                 connection_closed.set()
                 break
-            else:
-                print(f"💓 Heartbeat: Connection alive (last activity {time_since_activity:.1f}s ago)")
 
+    ping_task_handle = asyncio.create_task(ping_task())
     watchdog_task = asyncio.create_task(watchdog())
 
     # Wait for connection to close
     await connection_closed.wait()
 
-    # Cancel watchdog
+    # Cancel tasks
+    ping_task_handle.cancel()
     watchdog_task.cancel()
+    try:
+        await ping_task_handle
+    except asyncio.CancelledError:
+        pass
     try:
         await watchdog_task
     except asyncio.CancelledError:

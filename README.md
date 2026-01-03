@@ -89,10 +89,36 @@ sudo systemctl disable voice-assistant-client
 - `ALSA_DEVICE`: ALSA audio device (default: `hw:1,0`)
 - `ROOM`: Room identifier (default: `bedroom`)
 - `PIPECAT_SERVER`: Pipecat server URL (default: `http://pi-voice.local:7860`)
+- `HEALTHCHECK_INTERVAL`: Ping interval in seconds (default: `5`)
+- `HEALTHCHECK_TIMEOUT`: Pong timeout in seconds (default: `10`)
 
 Example:
 ```bash
 ALSA_DEVICE=hw:2,0 ROOM=kitchen python client.py
+```
+
+## Connection Management
+
+The client includes an active healthcheck mechanism to detect server failures:
+
+- **Ping/Pong**: Client sends a ping every 5 seconds (configurable via `HEALTHCHECK_INTERVAL`)
+- **Timeout Detection**: If no pong received within 10 seconds (configurable via `HEALTHCHECK_TIMEOUT`), client reconnects
+- **Auto-Reconnect**: Client automatically reconnects every 5 seconds after disconnection
+- **Connection Monitoring**: Logs show `🏓 Ping sent` and `🏓 Pong received` for visibility
+
+When the server restarts, you'll see:
+```
+⚠️  Watchdog: No pong for 11.2s (timeout: 10s) - reconnecting
+⏳ Waiting 5s before reconnecting...
+🔌 Connecting to http://pi-voice.local:7860...
+✅ Connected via WebRTC...
+```
+
+**Note**: The Pipecat server must respond to ping messages. Add this to your server's data channel handler:
+```python
+# In your Pipecat server
+if message_data.get("type") == "ping":
+    await data_channel.send(json.dumps({"type": "pong"}))
 ```
 
 ## Troubleshooting
