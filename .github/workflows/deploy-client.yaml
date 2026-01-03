@@ -25,6 +25,14 @@ jobs:
           uv python pin 3.9
           uv sync
 
+      - name: Debug runner identity
+        run: |
+          whoami
+          id
+          which systemctl
+          sudo -n true && echo "sudo nopasswd OK" || echo "sudo nopasswd NOT OK"
+          sudo -n systemctl status pipecat-room-client || true
+
       - name: Restart systemd service
         shell: bash
         run: |
