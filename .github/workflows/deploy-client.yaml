@@ -55,10 +55,9 @@ jobs:
             echo "⚠️  WARNING: Edit $ENV_FILE to set correct ROOM and ALSA_DEVICE"
           fi
 
-          # Create service file if missing
-          if [ ! -f "$SERVICE_FILE" ]; then
-            echo "Creating systemd service..."
-            sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+          # Create or update service file to ensure unbuffered output
+          echo "Creating/updating systemd service..."
+          sudo tee "$SERVICE_FILE" >/dev/null <<EOF
           [Unit]
           Description=Voice Assistant Client
           After=network-online.target sound.target
@@ -70,17 +69,21 @@ jobs:
           WorkingDirectory=/opt/voice-assistant-client
           EnvironmentFile=$ENV_FILE
           Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-          ExecStart=/usr/bin/env bash -lc 'cd /opt/voice-assistant-client && uv run python client.py'
+          Environment=PYTHONUNBUFFERED=1
+          ExecStart=/usr/bin/env bash -lc 'cd /opt/voice-assistant-client && uv run python -u client.py'
           Restart=always
           RestartSec=2
+          StandardOutput=journal
+          StandardError=journal
 
           [Install]
           WantedBy=multi-user.target
           EOF
-            sudo systemctl daemon-reload
+          sudo systemctl daemon-reload
+          if ! systemctl is-enabled voice-assistant-client >/dev/null 2>&1; then
             sudo systemctl enable voice-assistant-client
-            echo "✅ Service created and enabled"
           fi
+          echo "✅ Service updated"
 
       - name: Restart service
         run: |

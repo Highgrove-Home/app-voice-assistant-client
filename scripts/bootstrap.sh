@@ -59,9 +59,12 @@ User=$USER
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
 Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-ExecStart=/usr/bin/env bash -lc 'cd $APP_DIR && uv run python client.py'
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/env bash -lc 'cd $APP_DIR && uv run python -u client.py'
 Restart=always
 RestartSec=2
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
