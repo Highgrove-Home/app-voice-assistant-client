@@ -38,9 +38,14 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         print(f"   Command: {' '.join(cmd)}")
         self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
         self._pts = 0
+        self._last_recv_time = None
+        self._recv_count = 0
 
     async def recv(self):
         try:
+            self._recv_count += 1
+            self._last_recv_time = time.time()
+
             if self._pts == 0:
                 print(f"🎤 Starting audio capture: {self.frame_samples} samples/frame, mono, {self.sample_rate}Hz")
                 print(f"🎤 Track readyState: {self.readyState}")

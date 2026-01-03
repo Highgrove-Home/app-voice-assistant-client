@@ -139,6 +139,10 @@ async def main():
         # Check if the track is still active
         if hasattr(audio_track, '_pts'):
             print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
+        if hasattr(audio_track, '_recv_count'):
+            print(f"🔍 recv() called {audio_track._recv_count} times, last: {audio_track._last_recv_time}")
+        if hasattr(audio_track, 'readyState'):
+            print(f"🔍 Track readyState: {audio_track.readyState}")
 
         # Check RTP stats
         stats = await pc.getStats()
@@ -150,6 +154,10 @@ async def main():
         print(f"\n🔍 10s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
         if hasattr(audio_track, '_pts'):
             print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
+        if hasattr(audio_track, '_recv_count'):
+            print(f"🔍 recv() called {audio_track._recv_count} times, last: {audio_track._last_recv_time}")
+        if hasattr(audio_track, 'readyState'):
+            print(f"🔍 Track readyState: {audio_track.readyState}")
 
         stats = await pc.getStats()
         for stat in stats.values():
