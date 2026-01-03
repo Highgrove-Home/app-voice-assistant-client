@@ -105,19 +105,40 @@ async def main():
             answer = json.loads(text)
 
     await pc.setRemoteDescription(RTCSessionDescription(answer["sdp"], answer["type"]))
+
+    # Check negotiated codec
+    print("🔍 Checking negotiated transceivers...")
+    for transceiver in pc.getTransceivers():
+        if transceiver.sender and transceiver.sender.track:
+            print(f"   Sender track: {transceiver.sender.track.kind}")
+            if hasattr(transceiver, '_sender') and hasattr(transceiver._sender, '_codec'):
+                print(f"   Negotiated codec: {transceiver._sender._codec}")
+
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
 
-    # Monitor connection
+    # Monitor connection and RTP stats
     async def monitor():
         await asyncio.sleep(5)
-        print(f"🔍 5s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+        print(f"\n🔍 5s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
         # Check if the track is still active
         if hasattr(audio_track, '_pts'):
-            print(f"🔍 Audio track pts: {audio_track._pts} (frames sent: {audio_track._pts // 320})")
+            print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
+
+        # Check RTP stats
+        stats = await pc.getStats()
+        for stat in stats.values():
+            if stat.type == 'outbound-rtp' and stat.kind == 'audio':
+                print(f"🔍 RTP packets sent: {stat.packetsSent}, bytes: {stat.bytesSent}")
+
         await asyncio.sleep(5)
-        print(f"🔍 10s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+        print(f"\n🔍 10s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
         if hasattr(audio_track, '_pts'):
-            print(f"🔍 Audio track pts: {audio_track._pts} (frames sent: {audio_track._pts // 320})")
+            print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
+
+        stats = await pc.getStats()
+        for stat in stats.values():
+            if stat.type == 'outbound-rtp' and stat.kind == 'audio':
+                print(f"🔍 RTP packets sent: {stat.packetsSent}, bytes: {stat.bytesSent}")
 
     asyncio.create_task(monitor())
 
