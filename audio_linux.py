@@ -40,6 +40,7 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         self._pts = 0
         self._last_recv_time = None
         self._recv_count = 0
+        self._start_time = None
 
     async def recv(self):
         try:
@@ -89,11 +90,19 @@ class FFmpegAlsaTrack(MediaStreamTrack):
             frame.pts = self._pts
             frame.time_base = Fraction(1, self.sample_rate)
 
-            # Add wall-clock timestamp for aiortc
-            if self._start is None:
-                self._start = time.time()
-
             num_samples = arr.shape[1]  # shape is (channels, samples)
+
+            # Pace frames to real-time (like MediaPlayer does)
+            if self._start_time is None:
+                self._start_time = time.time()
+            else:
+                # Calculate when this frame should be sent based on sample count
+                expected_time = self._start_time + (self._pts / self.sample_rate)
+                current_time = time.time()
+                wait_time = expected_time - current_time
+
+                if wait_time > 0:
+                    await asyncio.sleep(wait_time)
 
             # Debug: log every frame for first 5 seconds, then every ~1 second
             frame_num = self._pts // self.frame_samples
