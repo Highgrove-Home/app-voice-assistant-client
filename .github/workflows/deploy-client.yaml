@@ -47,6 +47,7 @@ jobs:
           echo "sudo -n check:"; sudo -n true && echo "NOPASSWD OK" || echo "NOPASSWD FAIL"
           echo "sudoers file:"; cat /etc/sudoers.d/pipecat-room-client || true
 
-      - run: |
-        /usr/bin/systemctl restart pipecat-room-client
-        /usr/bin/systemctl --no-pager --full status pipecat-room-client
+      - name: Restart service
+        run: |
+          /usr/bin/systemctl restart pipecat-room-client
+          /usr/bin/systemctl --no-pager --full status pipecat-room-client
