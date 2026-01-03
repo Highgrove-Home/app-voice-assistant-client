@@ -42,16 +42,36 @@ async def main():
 
     @dc.on("open")
     def on_open():
+        print(f"📡 Data channel opened, sending room={ROOM}")
         dc.send(json.dumps({"room": ROOM, "client": "python-room-client"}))
 
     audio_track = build_mic_track()
     if not audio_track:
         raise RuntimeError("No audio track from microphone capture")
 
-    pc.addTrack(audio_track)
+    sender = pc.addTrack(audio_track)
+    print(f"🎵 Audio track added to peer connection: {audio_track}")
+
+    @pc.on("track")
+    def on_track(track):
+        print(f"📥 Received track from server: {track.kind}")
+
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        print(f"🔗 Connection state: {pc.connectionState}")
+
+    @pc.on("iceconnectionstatechange")
+    async def on_iceconnectionstatechange():
+        print(f"🧊 ICE connection state: {pc.iceConnectionState}")
 
     offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
+
+    # Debug: check if audio is in the SDP
+    if "m=audio" in pc.localDescription.sdp:
+        print("✅ Audio media in SDP offer")
+    else:
+        print("⚠️  WARNING: No audio media in SDP offer!")
 
     payload = {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
 
