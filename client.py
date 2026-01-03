@@ -6,7 +6,6 @@ import aiohttp
 
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
-from audio_linux import FFmpegAlsaTrack
 
 ROOM = os.environ.get("ROOM", "bedroom")
 SERVER = os.environ.get("PIPECAT_SERVER", "http://pi-voice.local:7860").rstrip("/")
@@ -26,13 +25,17 @@ def build_mic_track():
             raise RuntimeError("No audio track from macOS microphone")
         return player.audio
 
-    # Linux
-    alsa_dev = os.environ.get("ALSA_DEVICE", "hw:1,0")
-    return FFmpegAlsaTrack(
-        device=alsa_dev,
-        sample_rate=16000,
-        channels=1,
+    # Linux - use MediaPlayer with ALSA
+    alsa_dev = os.environ.get("ALSA_DEVICE", "plughw:1,0")
+    print(f"🎤 Using MediaPlayer with ALSA device: {alsa_dev}")
+    player = MediaPlayer(
+        alsa_dev,
+        format="alsa",
+        options={"sample_rate": "16000", "channels": "1"},
     )
+    if not player.audio:
+        raise RuntimeError("No audio track from ALSA microphone")
+    return player.audio
 
 async def main():
     pc = RTCPeerConnection()
