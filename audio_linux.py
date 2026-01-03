@@ -56,7 +56,16 @@ class FFmpegAlsaTrack(MediaStreamTrack):
                 raise RuntimeError(f"FFmpeg process died. stderr: {stderr_output}")
 
             assert self.proc.stdout is not None
+
+            # Read with explicit logging to detect blocking
+            if self._recv_count == 17:
+                print(f"🔍 About to read frame #{self._recv_count}, this should be frame #17...")
+
             data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
+
+            if self._recv_count == 17:
+                print(f"🔍 Read completed for frame #17, got {len(data) if data else 0} bytes")
+
             if not data or len(data) < self.frame_bytes:
                 stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
                 raise asyncio.CancelledError(f"Audio capture ended. stderr: {stderr_output}")
