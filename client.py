@@ -25,17 +25,30 @@ def build_mic_track():
             raise RuntimeError("No audio track from macOS microphone")
         return player.audio
 
-    # Linux - use MediaPlayer with ALSA
+    # Linux - try PulseAudio first, then fall back to custom ALSA track
+    pulse_source = os.environ.get("PULSE_SOURCE", "default")
+    try:
+        print(f"🎤 Trying MediaPlayer with PulseAudio source: {pulse_source}")
+        player = MediaPlayer(
+            f"pulse:{pulse_source}",
+            format="pulse",
+            options={"sample_rate": "16000", "channels": "1"},
+        )
+        if player.audio:
+            print("✅ Using PulseAudio via MediaPlayer")
+            return player.audio
+    except Exception as e:
+        print(f"⚠️  PulseAudio not available: {e}")
+
+    # Fallback to custom ALSA track
+    print("🎤 Falling back to custom FFmpegAlsaTrack")
+    from audio_linux import FFmpegAlsaTrack
     alsa_dev = os.environ.get("ALSA_DEVICE", "plughw:1,0")
-    print(f"🎤 Using MediaPlayer with ALSA device: {alsa_dev}")
-    player = MediaPlayer(
-        alsa_dev,
-        format="alsa",
-        options={"sample_rate": "16000", "channels": "1"},
+    return FFmpegAlsaTrack(
+        device=alsa_dev,
+        sample_rate=16000,
+        channels=1,
     )
-    if not player.audio:
-        raise RuntimeError("No audio track from ALSA microphone")
-    return player.audio
 
 async def main():
     pc = RTCPeerConnection()
