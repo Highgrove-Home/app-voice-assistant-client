@@ -56,12 +56,13 @@ class FFmpegAlsaTrack(MediaStreamTrack):
             # int16 mono samples, shape (samples,)
             samples = np.frombuffer(data, dtype=np.int16)
 
-            # IMPORTANT: shape must be (samples, channels) for from_ndarray
+            # IMPORTANT: PyAV expects shape (channels, samples) for packed formats
             if self.channels == 1:
-                arr = samples.reshape(-1, 1)
+                arr = samples.reshape(1, -1)  # (1, 320) for mono
                 layout = "mono"
             else:
-                arr = samples.reshape(-1, self.channels)
+                # For stereo, interleaved data needs to be split into channels
+                arr = samples.reshape(self.channels, -1)  # (2, samples)
                 layout = "stereo"
 
             frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
