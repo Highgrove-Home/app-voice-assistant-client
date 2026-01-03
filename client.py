@@ -3,6 +3,7 @@ import json
 import asyncio
 import platform
 import aiohttp
+import time
 
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
@@ -68,6 +69,8 @@ async def connect_to_server():
             try:
                 while True:
                     frame = await track.recv()
+                    # Update last activity time on incoming audio
+                    last_activity["time"] = time.time()
                     # For now, just discard (you could play this through speakers later)
                     if hasattr(frame, 'pts'):
                         pass  # Silently consume
@@ -76,18 +79,25 @@ async def connect_to_server():
 
         asyncio.create_task(consume_audio())
 
+    last_activity = {"time": time.time()}
+
+    @dc.on("message")
+    def on_dc_message(message):
+        # Update last activity time on any message (including heartbeats)
+        last_activity["time"] = time.time()
+
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"🔗 Connection state: {pc.connectionState}")
-        if pc.connectionState in ["failed", "closed"]:
-            print("⚠️  Connection failed or closed, will reconnect...")
+        if pc.connectionState in ["failed", "closed", "disconnected"]:
+            print("⚠️  Connection failed/closed/disconnected, will reconnect...")
             connection_closed.set()
 
     @pc.on("iceconnectionstatechange")
     async def on_iceconnectionstatechange():
         print(f"🧊 ICE connection state: {pc.iceConnectionState}")
-        if pc.iceConnectionState in ["failed", "closed"]:
-            print("⚠️  ICE connection failed or closed, will reconnect...")
+        if pc.iceConnectionState in ["failed", "closed", "disconnected"]:
+            print("⚠️  ICE connection failed/closed/disconnected, will reconnect...")
             connection_closed.set()
 
     offer = await pc.createOffer()
@@ -113,8 +123,46 @@ async def connect_to_server():
 
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
 
+    # Watchdog to detect dead connections
+    async def watchdog():
+        timeout = 30  # seconds without any activity
+        while not connection_closed.is_set():
+            await asyncio.sleep(10)
+
+            if connection_closed.is_set():
+                break
+
+            time_since_activity = time.time() - last_activity["time"]
+
+            # Also check connection state
+            if pc.connectionState in ["failed", "closed", "disconnected"]:
+                print(f"⚠️  Watchdog: Connection state is {pc.connectionState}")
+                connection_closed.set()
+                break
+
+            if pc.iceConnectionState in ["failed", "closed", "disconnected"]:
+                print(f"⚠️  Watchdog: ICE state is {pc.iceConnectionState}")
+                connection_closed.set()
+                break
+
+            if time_since_activity > timeout:
+                print(f"⚠️  Watchdog: No activity for {time_since_activity:.1f}s (timeout: {timeout}s)")
+                connection_closed.set()
+                break
+            else:
+                print(f"💓 Heartbeat: Connection alive (last activity {time_since_activity:.1f}s ago)")
+
+    watchdog_task = asyncio.create_task(watchdog())
+
     # Wait for connection to close
     await connection_closed.wait()
+
+    # Cancel watchdog
+    watchdog_task.cancel()
+    try:
+        await watchdog_task
+    except asyncio.CancelledError:
+        pass
 
     # Clean up
     await pc.close()
