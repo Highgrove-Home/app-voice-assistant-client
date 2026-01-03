@@ -12,13 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure uv installed
+      - name: Check uv
         shell: bash
         run: |
-          if ! command -v uv >/dev/null 2>&1; then
-            curl -LsSf https://astral.sh/uv/install.sh | sh
-          fi
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          which uv
           uv --version
 
       - name: Pin Python + sync deps
