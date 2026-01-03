@@ -104,12 +104,13 @@ class FFmpegAlsaTrack(MediaStreamTrack):
                 if wait_time > 0:
                     await asyncio.sleep(wait_time)
 
-            # Debug: log every frame for first 5 seconds, then every ~1 second
+            # Debug: log only first 10 frames, then every 10 seconds
             frame_num = self._pts // self.frame_samples
             avg_amplitude = np.abs(samples).mean()
 
-            if frame_num < 250 or (self._pts % (self.sample_rate) < self.frame_samples):
-                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={num_samples}, time_base={frame.time_base}")
+            # Log first 10 frames, then every 500 frames (10 seconds at 50fps)
+            if frame_num < 10 or frame_num % 500 == 0:
+                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={num_samples}")
 
             self._pts += num_samples
 

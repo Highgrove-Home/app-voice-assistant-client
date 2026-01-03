@@ -126,6 +126,7 @@ async def connect_to_server():
     # Watchdog to detect dead connections
     async def watchdog():
         timeout = 30  # seconds without any activity
+        print(f"🐕 Watchdog started (checking every 10s, timeout: {timeout}s)")
         while not connection_closed.is_set():
             await asyncio.sleep(10)
 
