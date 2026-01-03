@@ -56,6 +56,23 @@ async def main():
     def on_track(track):
         print(f"📥 Received track from server: {track.kind}")
 
+        @track.on("ended")
+        async def on_ended():
+            print(f"📥 Track ended: {track.kind}")
+
+        # Start consuming the incoming audio track (bot voice)
+        async def consume_audio():
+            try:
+                while True:
+                    frame = await track.recv()
+                    # For now, just discard (you could play this through speakers later)
+                    if hasattr(frame, 'pts'):
+                        pass  # Silently consume
+            except Exception as e:
+                print(f"📥 Incoming audio ended: {e}")
+
+        asyncio.create_task(consume_audio())
+
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"🔗 Connection state: {pc.connectionState}")
