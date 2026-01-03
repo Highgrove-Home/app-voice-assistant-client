@@ -1,0 +1,35 @@
+name: Deploy Voice Assistant Client
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, voice-assistant-client]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure uv installed
+        shell: bash
+        run: |
+          if ! command -v uv >/dev/null 2>&1; then
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+          fi
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          uv --version
+
+      - name: Pin Python + sync deps
+        shell: bash
+        run: |
+          uv python install 3.9
+          uv python pin 3.9
+          uv sync
+
+      - name: Restart systemd service
+        shell: bash
+        run: |
+          sudo systemctl restart pipecat-room-client
+          sudo systemctl --no-pager --full status pipecat-room-client
