@@ -121,6 +121,28 @@ if message_data.get("type") == "ping":
     await data_channel.send(json.dumps({"type": "pong"}))
 ```
 
+## Continuous Deployment
+
+When you register the device as a GitHub Actions self-hosted runner (during bootstrap), it will automatically:
+- Pull latest code from `main` branch (`git pull` in `/opt/voice-assistant-client`)
+- Install dependencies with `uv sync`
+- Restart the service
+
+### Manual Deployment
+
+To manually trigger deployment on all registered runners:
+1. Go to Actions tab in GitHub
+2. Select "Deploy Voice Assistant Client" workflow
+3. Click "Run workflow" → "Run workflow"
+
+Or SSH to the device and pull manually:
+```bash
+cd /opt/voice-assistant-client
+git pull
+uv sync
+sudo systemctl restart voice-assistant-client
+```
+
 ## Troubleshooting
 
 ### No Audio Being Sent

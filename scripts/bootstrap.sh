@@ -124,6 +124,11 @@ if [ -n "$RUNNER_TOKEN" ]; then
   sudo ./svc.sh install
   sudo ./svc.sh start
 
+  # Add sudoers permissions for deployment
+  echo "🔐 Setting up sudo permissions for deployment..."
+  echo "$USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl" | sudo tee /etc/sudoers.d/voice-assistant-client >/dev/null
+  sudo chmod 0440 /etc/sudoers.d/voice-assistant-client
+
   echo "✅ GitHub Actions runner configured and started"
 else
   echo "⏭️  Skipping GitHub Actions runner setup"

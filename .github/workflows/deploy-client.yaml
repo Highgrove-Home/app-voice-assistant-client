@@ -9,45 +9,23 @@ jobs:
   deploy:
     runs-on: [self-hosted, voice-assistant-client]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Check uv
+      - name: Pull latest code
         shell: bash
         run: |
-          which uv
-          uv --version
+          cd /opt/voice-assistant-client
+          git fetch origin
+          git checkout main
+          git pull --ff-only
 
-      - name: Pin Python + sync deps
+      - name: Install dependencies
         shell: bash
         run: |
+          cd /opt/voice-assistant-client
           uv python install 3.9
           uv python pin 3.9
           uv sync
 
-      - name: Debug sudo policy
-        run: |
-          echo "== user & groups =="
-          id
-          echo "== sudo -n -l (should show allowed commands) =="
-          sudo -n -l || true
-          echo "== sudo -l (may prompt; OK) =="
-          sudo -l || true
-          echo "== sudoers.d perms =="
-          ls -ld /etc/sudoers.d || true
-          ls -l /etc/sudoers.d || true
-
-      - name: Prove where this job is running
-        run: |
-          echo "whoami=$(whoami)"
-          echo "hostname=$(hostname)"
-          echo "uname=$(uname -a)"
-          echo "systemctl=$(which systemctl)"
-          echo "sudo version:"; sudo -V | head -n 3 || true
-          echo "sudo -n check:"; sudo -n true && echo "NOPASSWD OK" || echo "NOPASSWD FAIL"
-          echo "sudoers file:"; cat /etc/sudoers.d/pipecat-room-client || true
-
       - name: Restart service
         run: |
-          /usr/bin/systemctl restart pipecat-room-client
-          /usr/bin/systemctl --no-pager --full status pipecat-room-client
+          sudo /usr/bin/systemctl restart voice-assistant-client
+          sudo /usr/bin/systemctl --no-pager --full status voice-assistant-client
