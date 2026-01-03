@@ -74,11 +74,12 @@ class FFmpegAlsaTrack(MediaStreamTrack):
             # Debug: log every frame for first 5 seconds, then every ~1 second
             frame_num = self._pts // self.frame_samples
             avg_amplitude = np.abs(samples).mean()
+            num_samples = arr.shape[1]  # shape is (channels, samples)
 
             if frame_num < 250 or (self._pts % (self.sample_rate) < self.frame_samples):
-                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={arr.shape[0]}")
+                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={num_samples}")
 
-            self._pts += arr.shape[0]  # number of samples
+            self._pts += num_samples
 
             return frame
         except Exception as e:
