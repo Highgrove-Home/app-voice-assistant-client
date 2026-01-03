@@ -70,6 +70,10 @@ async def main():
     # Debug: check if audio is in the SDP
     if "m=audio" in pc.localDescription.sdp:
         print("✅ Audio media in SDP offer")
+        # Check for PCMU/PCMA codecs
+        for line in pc.localDescription.sdp.split('\n'):
+            if 'a=rtpmap' in line and 'audio' in pc.localDescription.sdp[:pc.localDescription.sdp.index(line)]:
+                print(f"   Codec: {line.strip()}")
     else:
         print("⚠️  WARNING: No audio media in SDP offer!")
 
@@ -85,6 +89,20 @@ async def main():
 
     await pc.setRemoteDescription(RTCSessionDescription(answer["sdp"], answer["type"]))
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
+
+    # Monitor connection
+    async def monitor():
+        await asyncio.sleep(5)
+        print(f"🔍 5s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+        # Check if the track is still active
+        if hasattr(audio_track, '_pts'):
+            print(f"🔍 Audio track pts: {audio_track._pts} (frames sent: {audio_track._pts // 320})")
+        await asyncio.sleep(5)
+        print(f"🔍 10s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+        if hasattr(audio_track, '_pts'):
+            print(f"🔍 Audio track pts: {audio_track._pts} (frames sent: {audio_track._pts // 320})")
+
+    asyncio.create_task(monitor())
 
     # Keep alive forever
     await asyncio.Event().wait()
