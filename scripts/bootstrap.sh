@@ -60,6 +60,7 @@ WorkingDirectory=$APP_DIR
 EnvironmentFile=$ENV_FILE
 Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=/bin/sleep 5
 ExecStart=/usr/bin/env bash -lc 'cd $APP_DIR && uv run python -u client.py'
 Restart=always
 RestartSec=2

@@ -36,7 +36,29 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         ]
         print(f"🎤 Starting FFmpeg ALSA capture from {device}")
         print(f"   Command: {' '.join(cmd)}")
-        self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+
+        # Retry logic for device busy errors (e.g., after boot)
+        max_retries = 3
+        retry_delay = 2
+
+        for attempt in range(max_retries):
+            self.proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+            # Give it a moment to start
+            time.sleep(0.5)
+
+            # Check if it died immediately
+            if self.proc.poll() is not None:
+                stderr = self.proc.stderr.read().decode()
+                if "Device or resource busy" in stderr and attempt < max_retries - 1:
+                    print(f"⚠️  Device busy, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    raise RuntimeError(f"FFmpeg failed to start: {stderr}")
+            else:
+                # Process started successfully
+                break
+
         self._pts = 0
         self._last_recv_time = None
         self._recv_count = 0
