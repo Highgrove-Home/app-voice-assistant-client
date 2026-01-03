@@ -132,37 +132,30 @@ async def main():
 
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
 
-    # Monitor connection and RTP stats
+    # Monitor connection and RTP stats continuously
     async def monitor():
-        await asyncio.sleep(5)
-        print(f"\n🔍 5s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
-        # Check if the track is still active
-        if hasattr(audio_track, '_pts'):
-            print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
-        if hasattr(audio_track, '_recv_count'):
-            print(f"🔍 recv() called {audio_track._recv_count} times, last: {audio_track._last_recv_time}")
-        if hasattr(audio_track, 'readyState'):
-            print(f"🔍 Track readyState: {audio_track.readyState}")
+        last_recv_count = 0
+        for i in range(10):
+            await asyncio.sleep(2)
+            elapsed = (i + 1) * 2
 
-        # Check RTP stats
-        stats = await pc.getStats()
-        for stat in stats.values():
-            if stat.type == 'outbound-rtp' and stat.kind == 'audio':
-                print(f"🔍 RTP packets sent: {stat.packetsSent}, bytes: {stat.bytesSent}")
+            recv_count = getattr(audio_track, '_recv_count', 0)
+            pts = getattr(audio_track, '_pts', 0)
+            ready_state = getattr(audio_track, 'readyState', 'unknown')
 
-        await asyncio.sleep(5)
-        print(f"\n🔍 10s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
-        if hasattr(audio_track, '_pts'):
-            print(f"🔍 Audio track pts: {audio_track._pts} (frames generated: {audio_track._pts // 320})")
-        if hasattr(audio_track, '_recv_count'):
-            print(f"🔍 recv() called {audio_track._recv_count} times, last: {audio_track._last_recv_time}")
-        if hasattr(audio_track, 'readyState'):
-            print(f"🔍 Track readyState: {audio_track.readyState}")
+            print(f"\n🔍 {elapsed}s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+            print(f"   Track: readyState={ready_state}, recv_count={recv_count}, pts={pts} (frames={pts//320})")
 
-        stats = await pc.getStats()
-        for stat in stats.values():
-            if stat.type == 'outbound-rtp' and stat.kind == 'audio':
-                print(f"🔍 RTP packets sent: {stat.packetsSent}, bytes: {stat.bytesSent}")
+            if recv_count == last_recv_count:
+                print(f"   ⚠️  WARNING: recv() has not been called in the last 2 seconds!")
+
+            last_recv_count = recv_count
+
+            # Check RTP stats
+            stats = await pc.getStats()
+            for stat in stats.values():
+                if stat.type == 'outbound-rtp' and stat.kind == 'audio':
+                    print(f"   RTP: packets={stat.packetsSent}, bytes={stat.bytesSent}")
 
     asyncio.create_task(monitor())
 
