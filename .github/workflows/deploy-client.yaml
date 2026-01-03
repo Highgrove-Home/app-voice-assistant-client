@@ -9,13 +9,25 @@ jobs:
   deploy:
     runs-on: [self-hosted, voice-assistant-client]
     steps:
-      - name: Pull latest code
+      - name: Setup application directory
         shell: bash
         run: |
-          cd /opt/voice-assistant-client
-          git fetch origin
-          git checkout main
-          git pull --ff-only
+          APP_DIR="/opt/voice-assistant-client"
+
+          if [ ! -d "$APP_DIR" ]; then
+            echo "Creating $APP_DIR..."
+            sudo mkdir -p "$APP_DIR"
+            sudo chown -R $USER:$USER "$APP_DIR"
+
+            echo "Cloning repository..."
+            git clone https://github.com/Highgrove-Home/app-voice-assistant-client "$APP_DIR"
+          else
+            echo "Updating existing repository..."
+            cd "$APP_DIR"
+            git fetch origin
+            git checkout main
+            git pull --ff-only
+          fi
 
       - name: Install dependencies
         shell: bash
