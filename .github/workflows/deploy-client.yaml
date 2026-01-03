@@ -33,6 +33,16 @@ jobs:
           sudo -n true && echo "sudo nopasswd OK" || echo "sudo nopasswd NOT OK"
           sudo -n systemctl status pipecat-room-client || true
 
+      - name: Prove where this job is running
+        run: |
+          echo "whoami=$(whoami)"
+          echo "hostname=$(hostname)"
+          echo "uname=$(uname -a)"
+          echo "systemctl=$(which systemctl)"
+          echo "sudo version:"; sudo -V | head -n 3 || true
+          echo "sudo -n check:"; sudo -n true && echo "NOPASSWD OK" || echo "NOPASSWD FAIL"
+          echo "sudoers file:"; cat /etc/sudoers.d/pipecat-room-client || true
+          
       - name: Restart systemd service
         run: |
           sudo /usr/bin/systemctl restart pipecat-room-client
