@@ -134,30 +134,37 @@ async def main():
 
     # Monitor connection and RTP stats continuously
     async def monitor():
+        print("📊 Monitor task started, will check every 2s")
         last_recv_count = 0
-        for i in range(10):
-            await asyncio.sleep(2)
-            elapsed = (i + 1) * 2
+        try:
+            for i in range(10):
+                await asyncio.sleep(2)
+                elapsed = (i + 1) * 2
 
-            recv_count = getattr(audio_track, '_recv_count', 0)
-            pts = getattr(audio_track, '_pts', 0)
-            ready_state = getattr(audio_track, 'readyState', 'unknown')
+                recv_count = getattr(audio_track, '_recv_count', 0)
+                pts = getattr(audio_track, '_pts', 0)
+                ready_state = getattr(audio_track, 'readyState', 'unknown')
 
-            print(f"\n🔍 {elapsed}s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
-            print(f"   Track: readyState={ready_state}, recv_count={recv_count}, pts={pts} (frames={pts//320})")
+                print(f"\n🔍 {elapsed}s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
+                print(f"   Track: readyState={ready_state}, recv_count={recv_count}, pts={pts} (frames={pts//320})")
 
-            if recv_count == last_recv_count:
-                print(f"   ⚠️  WARNING: recv() has not been called in the last 2 seconds!")
+                if recv_count == last_recv_count:
+                    print(f"   ⚠️  WARNING: recv() has not been called in the last 2 seconds!")
 
-            last_recv_count = recv_count
+                last_recv_count = recv_count
 
-            # Check RTP stats
-            stats = await pc.getStats()
-            for stat in stats.values():
-                if stat.type == 'outbound-rtp' and stat.kind == 'audio':
-                    print(f"   RTP: packets={stat.packetsSent}, bytes={stat.bytesSent}")
+                # Check RTP stats
+                stats = await pc.getStats()
+                for stat in stats.values():
+                    if stat.type == 'outbound-rtp' and stat.kind == 'audio':
+                        print(f"   RTP: packets={stat.packetsSent}, bytes={stat.bytesSent}")
+        except Exception as e:
+            print(f"❌ Monitor task exception: {e}")
+            import traceback
+            traceback.print_exc()
 
-    asyncio.create_task(monitor())
+    monitor_task = asyncio.create_task(monitor())
+    print(f"📊 Monitor task created: {monitor_task}")
 
     # Keep alive forever
     await asyncio.Event().wait()
