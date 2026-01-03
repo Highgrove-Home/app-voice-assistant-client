@@ -25,6 +25,51 @@ jobs:
           uv python pin 3.9
           uv sync
 
+      - name: Ensure service exists
+        shell: bash
+        run: |
+          SERVICE_FILE="/etc/systemd/system/voice-assistant-client.service"
+          ENV_FILE="/etc/voice-assistant-client.env"
+
+          # Create env file if missing
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "Creating $ENV_FILE with defaults..."
+            sudo tee "$ENV_FILE" >/dev/null <<'EOF'
+          ROOM=unknown
+          PIPECAT_SERVER=http://pi-voice.local:7860
+          ALSA_DEVICE=plughw:1,0
+          EOF
+            sudo chmod 0644 "$ENV_FILE"
+            echo "⚠️  WARNING: Edit $ENV_FILE to set correct ROOM and ALSA_DEVICE"
+          fi
+
+          # Create service file if missing
+          if [ ! -f "$SERVICE_FILE" ]; then
+            echo "Creating systemd service..."
+            sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+          [Unit]
+          Description=Voice Assistant Client
+          After=network-online.target sound.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=$USER
+          WorkingDirectory=/opt/voice-assistant-client
+          EnvironmentFile=$ENV_FILE
+          Environment=PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          ExecStart=/usr/bin/env bash -lc 'cd /opt/voice-assistant-client && uv run python client.py'
+          Restart=always
+          RestartSec=2
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+            sudo systemctl daemon-reload
+            sudo systemctl enable voice-assistant-client
+            echo "✅ Service created and enabled"
+          fi
+
       - name: Restart service
         run: |
           sudo /usr/bin/systemctl restart voice-assistant-client
