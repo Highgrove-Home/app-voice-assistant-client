@@ -1,6 +1,7 @@
 import asyncio
 import subprocess
 from typing import Optional
+import time
 
 import numpy as np
 from aiortc import MediaStreamTrack
@@ -15,6 +16,7 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         super().__init__()
         self.sample_rate = sample_rate
         self.channels = channels
+        self._start = None  # Track start time for proper timestamps
 
         # 16-bit little-endian PCM
         self.bytes_per_sample = 2
@@ -41,6 +43,7 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         try:
             if self._pts == 0:
                 print(f"🎤 Starting audio capture: {self.frame_samples} samples/frame, mono, {self.sample_rate}Hz")
+                print(f"🎤 Track readyState: {self.readyState}")
 
             # Check if FFmpeg process has died
             if self.proc.poll() is not None:
@@ -68,16 +71,22 @@ class FFmpegAlsaTrack(MediaStreamTrack):
             frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
             frame.sample_rate = self.sample_rate
 
+            # Use proper timestamps based on sample count
             frame.pts = self._pts
             frame.time_base = Fraction(1, self.sample_rate)
+
+            # Add wall-clock timestamp for aiortc
+            if self._start is None:
+                self._start = time.time()
+
+            num_samples = arr.shape[1]  # shape is (channels, samples)
 
             # Debug: log every frame for first 5 seconds, then every ~1 second
             frame_num = self._pts // self.frame_samples
             avg_amplitude = np.abs(samples).mean()
-            num_samples = arr.shape[1]  # shape is (channels, samples)
 
             if frame_num < 250 or (self._pts % (self.sample_rate) < self.frame_samples):
-                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={num_samples}")
+                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={num_samples}, time_base={frame.time_base}")
 
             self._pts += num_samples
 
