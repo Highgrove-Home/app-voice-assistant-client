@@ -20,14 +20,68 @@ This client is meant to run on mini PCs or Linux devices connected to ReSpeaker 
 
 ## Installation
 
+### Quick Setup (New Device)
+
+For setting up a new mini PC or Linux device:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Highgrove-Home/app-voice-assistant-client/main/scripts/bootstrap.sh | bash
+```
+
+This will:
+- Install system dependencies (ffmpeg, git)
+- Install uv (Python package manager)
+- Clone the repository to `/opt/voice-assistant-client`
+- Install Python dependencies
+- Create a systemd service that starts on boot
+- Generate config file at `/etc/voice-assistant-client.env`
+- **Optionally** register the device as a GitHub Actions self-hosted runner (prompted during setup)
+
+After bootstrap completes:
+1. Run the audio diagnostic to find the correct ALSA device:
+   ```bash
+   cd /opt/voice-assistant-client
+   python scripts/audio_debug.py
+   ```
+2. Edit `/etc/voice-assistant-client.env` to set:
+   - `ROOM`: The room name (e.g., `bedroom`, `kitchen`, `living_room`)
+   - `ALSA_DEVICE`: The working device from step 1 (e.g., `plughw:1,0`)
+3. Restart the service: `sudo systemctl restart voice-assistant-client`
+4. Check logs: `sudo journalctl -u voice-assistant-client -f`
+
+### Manual Installation
+
 ```bash
 uv sync
 ```
 
 ## Usage
 
+### Running Manually
+
 ```bash
 python client.py
+```
+
+### Running as a Service
+
+The bootstrap script automatically sets up a systemd service. Manage it with:
+
+```bash
+# Check status
+sudo systemctl status voice-assistant-client
+
+# View logs
+sudo journalctl -u voice-assistant-client -f
+
+# Restart
+sudo systemctl restart voice-assistant-client
+
+# Stop
+sudo systemctl stop voice-assistant-client
+
+# Disable autostart
+sudo systemctl disable voice-assistant-client
 ```
 
 ### Environment Variables
