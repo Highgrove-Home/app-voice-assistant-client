@@ -38,47 +38,53 @@ class FFmpegAlsaTrack(MediaStreamTrack):
         self._pts = 0
 
     async def recv(self):
-        if self._pts == 0:
-            print(f"🎤 Starting audio capture: {self.frame_samples} samples/frame, mono, {self.sample_rate}Hz")
+        try:
+            if self._pts == 0:
+                print(f"🎤 Starting audio capture: {self.frame_samples} samples/frame, mono, {self.sample_rate}Hz")
 
-        # Check if FFmpeg process has died
-        if self.proc.poll() is not None:
-            stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
-            raise RuntimeError(f"FFmpeg process died. stderr: {stderr_output}")
+            # Check if FFmpeg process has died
+            if self.proc.poll() is not None:
+                stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
+                raise RuntimeError(f"FFmpeg process died. stderr: {stderr_output}")
 
-        assert self.proc.stdout is not None
-        data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
-        if not data or len(data) < self.frame_bytes:
-            stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
-            raise asyncio.CancelledError(f"Audio capture ended. stderr: {stderr_output}")
+            assert self.proc.stdout is not None
+            data = await asyncio.get_event_loop().run_in_executor(None, self.proc.stdout.read, self.frame_bytes)
+            if not data or len(data) < self.frame_bytes:
+                stderr_output = self.proc.stderr.read().decode() if self.proc.stderr else "No error output"
+                raise asyncio.CancelledError(f"Audio capture ended. stderr: {stderr_output}")
 
-        # int16 mono samples, shape (samples,)
-        samples = np.frombuffer(data, dtype=np.int16)
+            # int16 mono samples, shape (samples,)
+            samples = np.frombuffer(data, dtype=np.int16)
 
-        # IMPORTANT: shape must be (samples, channels) for from_ndarray
-        if self.channels == 1:
-            arr = samples.reshape(-1, 1)
-            layout = "mono"
-        else:
-            arr = samples.reshape(-1, self.channels)
-            layout = "stereo"
+            # IMPORTANT: shape must be (samples, channels) for from_ndarray
+            if self.channels == 1:
+                arr = samples.reshape(-1, 1)
+                layout = "mono"
+            else:
+                arr = samples.reshape(-1, self.channels)
+                layout = "stereo"
 
-        frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
-        frame.sample_rate = self.sample_rate
+            frame = av.AudioFrame.from_ndarray(arr, format="s16", layout=layout)
+            frame.sample_rate = self.sample_rate
 
-        frame.pts = self._pts
-        frame.time_base = Fraction(1, self.sample_rate)
+            frame.pts = self._pts
+            frame.time_base = Fraction(1, self.sample_rate)
 
-        # Debug: log every frame for first 5 seconds, then every ~1 second
-        frame_num = self._pts // self.frame_samples
-        avg_amplitude = np.abs(samples).mean()
+            # Debug: log every frame for first 5 seconds, then every ~1 second
+            frame_num = self._pts // self.frame_samples
+            avg_amplitude = np.abs(samples).mean()
 
-        if frame_num < 250 or (self._pts % (self.sample_rate) < self.frame_samples):
-            print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={arr.shape[0]}")
+            if frame_num < 250 or (self._pts % (self.sample_rate) < self.frame_samples):
+                print(f"🎤 Frame #{frame_num}: pts={self._pts}, amp={avg_amplitude:.1f}, samples={arr.shape[0]}")
 
-        self._pts += arr.shape[0]  # number of samples
+            self._pts += arr.shape[0]  # number of samples
 
-        return frame
+            return frame
+        except Exception as e:
+            print(f"❌ Exception in recv(): {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def stop(self):
         super().stop()
