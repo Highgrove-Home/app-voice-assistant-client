@@ -35,8 +35,10 @@ def build_mic_track():
         channels=1,
     )
 
-async def main():
+async def connect_to_server():
+    """Attempt to connect to the server and maintain the connection"""
     pc = RTCPeerConnection()
+    connection_closed = asyncio.Event()
 
     # Data channel for metadata (room, etc.)
     dc = pc.createDataChannel("meta")
@@ -77,10 +79,16 @@ async def main():
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"🔗 Connection state: {pc.connectionState}")
+        if pc.connectionState in ["failed", "closed"]:
+            print("⚠️  Connection failed or closed, will reconnect...")
+            connection_closed.set()
 
     @pc.on("iceconnectionstatechange")
     async def on_iceconnectionstatechange():
         print(f"🧊 ICE connection state: {pc.iceConnectionState}")
+        if pc.iceConnectionState in ["failed", "closed"]:
+            print("⚠️  ICE connection failed or closed, will reconnect...")
+            connection_closed.set()
 
     offer = await pc.createOffer()
     await pc.setLocalDescription(offer)
@@ -88,10 +96,6 @@ async def main():
     # Debug: check if audio is in the SDP
     if "m=audio" in pc.localDescription.sdp:
         print("✅ Audio media in SDP offer")
-        # Check for PCMU/PCMA codecs
-        for line in pc.localDescription.sdp.split('\n'):
-            if 'a=rtpmap' in line and 'audio' in pc.localDescription.sdp[:pc.localDescription.sdp.index(line)]:
-                print(f"   Codec: {line.strip()}")
     else:
         print("⚠️  WARNING: No audio media in SDP offer!")
 
@@ -107,52 +111,33 @@ async def main():
 
     await pc.setRemoteDescription(RTCSessionDescription(answer["sdp"], answer["type"]))
 
-    # Check negotiated codec
-    print("🔍 Checking negotiated transceivers...")
-    for transceiver in pc.getTransceivers():
-        if transceiver.sender and transceiver.sender.track:
-            print(f"   Sender track: {transceiver.sender.track.kind}")
-            if hasattr(transceiver, '_sender') and hasattr(transceiver._sender, '_codec'):
-                print(f"   Negotiated codec: {transceiver._sender._codec}")
-
     print(f"✅ Connected via WebRTC to {OFFER_URL} (room={ROOM})")
 
-    # Monitor connection and RTP stats continuously
-    async def monitor():
-        print("📊 Monitor task started, will check every 2s")
-        last_recv_count = 0
+    # Wait for connection to close
+    await connection_closed.wait()
+
+    # Clean up
+    await pc.close()
+
+    # Stop audio track
+    if hasattr(audio_track, 'stop'):
+        audio_track.stop()
+
+
+async def main():
+    retry_delay = 5  # seconds
+
+    while True:
         try:
-            for i in range(10):
-                await asyncio.sleep(2)
-                elapsed = (i + 1) * 2
-
-                recv_count = getattr(audio_track, '_recv_count', 0)
-                pts = getattr(audio_track, '_pts', 0)
-                ready_state = getattr(audio_track, 'readyState', 'unknown')
-
-                print(f"\n🔍 {elapsed}s check - Connection: {pc.connectionState}, ICE: {pc.iceConnectionState}")
-                print(f"   Track: readyState={ready_state}, recv_count={recv_count}, pts={pts} (frames={pts//320})")
-
-                if recv_count == last_recv_count:
-                    print(f"   ⚠️  WARNING: recv() has not been called in the last 2 seconds!")
-
-                last_recv_count = recv_count
-
-                # Check RTP stats
-                stats = await pc.getStats()
-                for stat in stats.values():
-                    if stat.type == 'outbound-rtp' and stat.kind == 'audio':
-                        print(f"   RTP: packets={stat.packetsSent}, bytes={stat.bytesSent}")
+            print(f"🔌 Connecting to {SERVER}...")
+            await connect_to_server()
         except Exception as e:
-            print(f"❌ Monitor task exception: {e}")
+            print(f"❌ Connection error: {e}")
             import traceback
             traceback.print_exc()
 
-    monitor_task = asyncio.create_task(monitor())
-    print(f"📊 Monitor task created: {monitor_task}")
-
-    # Keep alive forever
-    await asyncio.Event().wait()
+        print(f"⏳ Waiting {retry_delay}s before reconnecting...")
+        await asyncio.sleep(retry_delay)
 
 if __name__ == "__main__":
     asyncio.run(main())
