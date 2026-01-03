@@ -25,13 +25,17 @@ jobs:
           uv python pin 3.9
           uv sync
 
-      - name: Debug runner identity
+      - name: Debug sudo policy
         run: |
-          whoami
+          echo "== user & groups =="
           id
-          which systemctl
-          sudo -n true && echo "sudo nopasswd OK" || echo "sudo nopasswd NOT OK"
-          sudo -n systemctl status pipecat-room-client || true
+          echo "== sudo -n -l (should show allowed commands) =="
+          sudo -n -l || true
+          echo "== sudo -l (may prompt; OK) =="
+          sudo -l || true
+          echo "== sudoers.d perms =="
+          ls -ld /etc/sudoers.d || true
+          ls -l /etc/sudoers.d || true
 
       - name: Prove where this job is running
         run: |
@@ -42,7 +46,7 @@ jobs:
           echo "sudo version:"; sudo -V | head -n 3 || true
           echo "sudo -n check:"; sudo -n true && echo "NOPASSWD OK" || echo "NOPASSWD FAIL"
           echo "sudoers file:"; cat /etc/sudoers.d/pipecat-room-client || true
-          
+
       - name: Restart systemd service
         run: |
           sudo /usr/bin/systemctl restart pipecat-room-client
